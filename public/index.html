@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Testing App</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="app">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <h2>History</h2>
+          <button onclick="clearHistory()">Clear</button>
+        </div>
+
+        <ul id="historyList"></ul>
+      </div>
+
+      <!-- Main Section -->
+      <div class="main">
+        <div class="container">
+          <h1>API Testing App</h1>
+
+          <label>API URL</label>
+          <input
+            type="text"
+            id="apiUrl"
+            placeholder="https://jsonplaceholder.typicode.com/posts"
+          />
+
+          <label>HTTP Method</label>
+          <select id="method">
+            <option>GET</option>
+            <option>POST</option>
+            <option>PUT</option>
+            <option>DELETE</option>
+          </select>
+
+          <label>Request Body (JSON)</label>
+          <textarea id="body" rows="6"></textarea>
+
+          <div class="buttons">
+            <button onclick="sendRequest()">Send Request</button>
+            <button onclick="clearFields()">Clear</button>
+          </div>
+
+          <!-- RESPONSE SECTION -->
+          <div class="response-section">
+            <h2>Response</h2>
+
+            <p>Status: <span id="status">-</span></p>
+            <p>Time: <span id="time">-</span></p>
+
+            <button class="copy-btn" onclick="copyResponse()">Copy JSON</button>
+
+            <div class="response-box">
+              <pre id="response"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
