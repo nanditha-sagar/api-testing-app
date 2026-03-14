@@ -205,3 +205,60 @@ pre {
 #status {
   font-weight: bold;
 }
+/* SIDEBAR COLLAPSE */
+
+.sidebar {
+  width: 260px;
+  transition: 0.3s;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* MAIN AREA EXPAND */
+
+.main {
+  flex: 1;
+  transition: 0.3s;
+}
+
+/* TOGGLE BUTTON */
+
+.toggle-btn {
+  background: #333;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+/* JSON Syntax Highlight */
+
+pre {
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+
+.key {
+  color: #ffb454;
+}
+
+.string {
+  color: #6ab04c;
+}
+
+.number {
+  color: #3498db;
+}
+
+.boolean {
+  color: #e056fd;
+}
+
+.null {
+  color: #ff7979;
+}

@@ -53,11 +53,19 @@
 
     <script>
       async function login() {
-        const name = document.getElementById("name").value;
-        const email = document.getElementById("email").value;
+        const name = document.getElementById("name").value.trim();
+        const email = document.getElementById("email").value.trim();
 
-        if (!name || !email) {
-          alert("Please fill all fields");
+        // email regex validation
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!name) {
+          alert("Please enter your name");
+          return;
+        }
+
+        if (!emailPattern.test(email)) {
+          alert("Please enter a valid email address");
           return;
         }
 
@@ -69,7 +77,6 @@
           body: JSON.stringify({ name, email }),
         });
 
-        // store user locally
         localStorage.setItem("userName", name);
         localStorage.setItem("userEmail", email);
 

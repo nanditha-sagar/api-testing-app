@@ -42,8 +42,23 @@ async function sendRequest(fromHistory = false) {
     statusElement.textContent = response.status + " " + response.statusText;
 
     timeElement.textContent = responseTime + " ms";
+    responseElement.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+    const email = localStorage.getItem("userEmail");
 
-    responseElement.textContent = JSON.stringify(data, null, 2);
+    await fetch("/api/save-history", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email,
+        method: method,
+        url: url,
+        body: body,
+        status: response.status,
+        time: responseTime,
+      }),
+    });
   } catch (error) {
     statusElement.textContent = "Error";
 
@@ -123,3 +138,37 @@ window.onload = () => {
     display.textContent = "Welcome " + name;
   }
 };
+
+function toggleSidebar() {
+  const sidebar = document.querySelector(".sidebar");
+
+  sidebar.classList.toggle("collapsed");
+}
+
+function syntaxHighlight(json) {
+  json = json
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  return json.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    function (match) {
+      let cls = "number";
+
+      if (/^"/.test(match)) {
+        if (/:$/.test(match)) {
+          cls = "key";
+        } else {
+          cls = "string";
+        }
+      } else if (/true|false/.test(match)) {
+        cls = "boolean";
+      } else if (/null/.test(match)) {
+        cls = "null";
+      }
+
+      return '<span class="' + cls + '">' + match + "</span>";
+    },
+  );
+}
