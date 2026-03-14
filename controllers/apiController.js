@@ -1,38 +1,19 @@
 const axios = require("axios");
 const db = require("../config/db");
 
+// API testing controller
 const testAPI = async (req, res) => {
   const { url, method, body } = req.body;
 
-  const startTime = Date.now();
-
   try {
     const response = await axios({
-      url: url,
-      method: method,
+      url,
+      method,
       data: body,
     });
 
-    const endTime = Date.now();
-    const responseTime = endTime - startTime;
-
-    const statusCode = response.status;
-
-    // store request history in database
-    const query = `
-            INSERT INTO api_history (url, method, status_code, response_time)
-            VALUES (?, ?, ?, ?)
-        `;
-
-    // db.query(query, [url, method, statusCode, responseTime], (err) => {
-    //   if (err) {
-    //     console.log("Database insert error:", err);
-    //   }
-    // });
-
     res.json({
-      status: statusCode,
-      time: responseTime,
+      status: response.status,
       data: response.data,
     });
   } catch (error) {
@@ -43,6 +24,22 @@ const testAPI = async (req, res) => {
   }
 };
 
+// login controller
+const loginUser = (req, res) => {
+  const { name, email } = req.body;
+
+  const sql = "INSERT INTO users (name,email) VALUES (?,?)";
+
+  db.query(sql, [name, email], (err, result) => {
+    if (err) {
+      return res.status(500).json(err);
+    }
+
+    res.json({ message: "User stored successfully" });
+  });
+};
+
 module.exports = {
   testAPI,
+  loginUser,
 };

@@ -12,7 +12,7 @@ async function sendRequest(fromHistory = false) {
     return;
   }
 
-  // Only add history if request is not from history
+  // add history only if request is new
   if (!fromHistory) {
     addToHistory(url, method);
   }
@@ -64,7 +64,7 @@ function addToHistory(url, method) {
   methodSpan.textContent = method;
 
   const urlSpan = document.createElement("span");
-  urlSpan.textContent = new URL(url).pathname;
+  urlSpan.textContent = url;
 
   li.appendChild(methodSpan);
   li.appendChild(urlSpan);
@@ -73,48 +73,7 @@ function addToHistory(url, method) {
     document.getElementById("apiUrl").value = url;
     document.getElementById("method").value = method;
 
-    await sendRequest(true); // prevent duplicate history
-  };
-
-  historyList.prepend(li);
-}
-
-function clearFields() {
-  document.getElementById("apiUrl").value = "";
-  document.getElementById("body").value = "";
-  document.getElementById("response").textContent = "";
-  document.getElementById("status").textContent = "-";
-  document.getElementById("time").textContent = "-";
-}
-
-function clearHistory() {
-  document.getElementById("historyList").innerHTML = "";
-}
-
-// function to add request history
-function addToHistory(url, method) {
-  const historyList = document.getElementById("historyList");
-
-  const li = document.createElement("li");
-  li.className = "history-item";
-
-  const methodSpan = document.createElement("span");
-  methodSpan.className = "method " + method.toLowerCase();
-  methodSpan.textContent = method;
-
-  const urlSpan = document.createElement("span");
-  urlSpan.textContent = new URL(url).pathname;
-
-  li.appendChild(methodSpan);
-  li.appendChild(urlSpan);
-
-  // When history item is clicked
-  li.onclick = async () => {
-    document.getElementById("apiUrl").value = url;
-    document.getElementById("method").value = method;
-
-    // automatically send request again
-    await sendRequest();
+    await sendRequest(true);
   };
 
   historyList.prepend(li);
