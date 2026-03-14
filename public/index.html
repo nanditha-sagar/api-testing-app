@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>API Testing App</title>
+
     <link rel="stylesheet" href="style.css" />
   </head>
 
@@ -22,6 +23,12 @@
       <!-- Main Section -->
       <div class="main">
         <div class="container">
+          <!-- TOP BAR -->
+          <div class="top-bar">
+            <span id="userDisplay"></span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+          </div>
+
           <h1>API Testing App</h1>
 
           <label>API URL</label>
@@ -49,12 +56,15 @@
 
           <!-- RESPONSE SECTION -->
           <div class="response-section">
-            <h2>Response</h2>
+            <div class="response-header">
+              <h2>Response</h2>
+              <button class="copy-btn" onclick="copyResponse()">
+                Copy JSON
+              </button>
+            </div>
 
             <p>Status: <span id="status">-</span></p>
             <p>Time: <span id="time">-</span></p>
-
-            <button class="copy-btn" onclick="copyResponse()">Copy JSON</button>
 
             <div class="response-box">
               <pre id="response"></pre>

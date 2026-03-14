@@ -69,6 +69,10 @@
           body: JSON.stringify({ name, email }),
         });
 
+        // store user locally
+        localStorage.setItem("userName", name);
+        localStorage.setItem("userEmail", email);
+
         window.location.href = "/index.html";
       }
     </script>

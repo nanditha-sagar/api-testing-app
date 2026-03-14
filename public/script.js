@@ -103,3 +103,23 @@ function copyResponse() {
 
   alert("Response copied to clipboard!");
 }
+
+function logout() {
+  localStorage.removeItem("userName");
+  localStorage.removeItem("userEmail");
+
+  window.location.href = "/login.html";
+}
+window.onload = () => {
+  const name = localStorage.getItem("userName");
+
+  if (!name) {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  const display = document.getElementById("userDisplay");
+  if (display) {
+    display.textContent = "Welcome " + name;
+  }
+};
