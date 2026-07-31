@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>API Testing App</title>
-
     <link rel="stylesheet" href="style.css" />
   </head>
 
@@ -13,11 +12,24 @@
       <!-- Sidebar -->
       <div class="sidebar">
         <div class="sidebar-header">
-          <h2>History</h2>
-          <button onclick="clearHistory()">Clear</button>
+          <h2>API Tester</h2>
+        </div>
+        
+        <div class="sidebar-tabs">
+          <button id="tab-history-btn" class="sidebar-tab-btn active" onclick="switchSidebarTab('history')">History</button>
+          <button id="tab-saved-btn" class="sidebar-tab-btn" onclick="switchSidebarTab('saved')">Saved</button>
         </div>
 
-        <ul id="historyList"></ul>
+        <div id="historySection" class="sidebar-section">
+          <div class="section-actions">
+            <button class="clear-btn" onclick="clearHistory()">Clear History</button>
+          </div>
+          <ul id="historyList"></ul>
+        </div>
+
+        <div id="savedSection" class="sidebar-section" style="display: none;">
+          <ul id="savedList"></ul>
+        </div>
       </div>
 
       <!-- Main Section -->
@@ -25,34 +37,73 @@
         <div class="container">
           <!-- TOP BAR -->
           <div class="top-bar">
-            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
-            <span id="userDisplay"></span>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+            <div class="top-bar-left">
+              <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+              <div class="env-selector-wrapper">
+                <select id="envSelector" onchange="handleEnvChange()">
+                  <option value="none">No Environment</option>
+                  <option value="dev">Development</option>
+                  <option value="test">Testing</option>
+                  <option value="prod">Production</option>
+                </select>
+                <button class="env-settings-btn" onclick="openEnvModal()" title="Manage Environments">⚙️</button>
+              </div>
+            </div>
+            
+            <div class="top-bar-right">
+              <span id="userDisplay"></span>
+              <button class="status-helper-btn" onclick="toggleStatusHelper()">Status Codes</button>
+              <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
           </div>
 
-          <h1>API Testing App</h1>
+          <h1>API Request Builder</h1>
 
-          <label>API URL</label>
-          <input
-            type="text"
-            id="apiUrl"
-            placeholder="https://jsonplaceholder.typicode.com/posts"
-          />
+          <div class="request-row">
+            <div class="method-col">
+              <label>Method</label>
+              <select id="method">
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>DELETE</option>
+              </select>
+            </div>
+            
+            <div class="url-col">
+              <label>API URL (supports variables like <code>{{base_url}}</code>)</label>
+              <input
+                type="text"
+                id="apiUrl"
+                placeholder="https://jsonplaceholder.typicode.com/posts"
+              />
+            </div>
+          </div>
 
-          <label>HTTP Method</label>
-          <select id="method">
-            <option>GET</option>
-            <option>POST</option>
-            <option>PUT</option>
-            <option>DELETE</option>
-          </select>
+          <label>Headers</label>
+          <div class="headers-container">
+            <table id="headersTable">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th width="40px"></th>
+                </tr>
+              </thead>
+              <tbody id="headersTableBody">
+                <!-- Javascript will inject initial empty row -->
+              </tbody>
+            </table>
+            <button class="add-row-btn" onclick="addHeaderRow()">+ Add Header</button>
+          </div>
 
           <label>Request Body (JSON)</label>
-          <textarea id="body" rows="6"></textarea>
+          <textarea id="body" rows="6" placeholder='{ "title": "foo", "body": "bar", "userId": 1 }'></textarea>
 
           <div class="buttons">
-            <button onclick="sendRequest()">Send Request</button>
-            <button onclick="clearFields()">Clear</button>
+            <button class="send-btn" onclick="sendRequest()">Send Request</button>
+            <button class="save-request-btn" onclick="promptSaveRequest()">Save Request</button>
+            <button class="clear-fields-btn" onclick="clearFields()">Clear Fields</button>
           </div>
 
           <!-- RESPONSE SECTION -->
@@ -64,8 +115,10 @@
               </button>
             </div>
 
-            <p>Status: <span id="status">-</span></p>
-            <p>Time: <span id="time">-</span></p>
+            <div class="response-meta">
+              <p>Status: <span id="status" class="status-badge">-</span></p>
+              <p>Time: <span id="time" class="time-badge">-</span></p>
+            </div>
 
             <div class="response-box">
               <pre id="response"></pre>
@@ -73,6 +126,57 @@
           </div>
         </div>
       </div>
+
+      <!-- Environment Modal -->
+      <div id="envModal" class="modal">
+        <div class="modal-content">
+          <span class="close" onclick="closeEnvModal()">&times;</span>
+          <h2>Manage Environments</h2>
+          <div class="env-tabs">
+            <button id="env-tab-dev" class="env-tab-btn active" onclick="switchEnvTab('dev')">Development</button>
+            <button id="env-tab-test" class="env-tab-btn" onclick="switchEnvTab('test')">Testing</button>
+            <button id="env-tab-prod" class="env-tab-btn" onclick="switchEnvTab('prod')">Production</button>
+          </div>
+          
+          <div class="env-var-container">
+            <div class="env-var-header">
+              <h3>Variables for <span id="activeEnvLabel">Development</span></h3>
+            </div>
+            <table id="envTable">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th width="40px"></th>
+                </tr>
+              </thead>
+              <tbody id="envTableBody">
+                <!-- Dynamic environment rows injected here -->
+              </tbody>
+            </table>
+            <button class="add-row-btn" onclick="addEnvRow()">+ Add Variable</button>
+          </div>
+
+          <div class="modal-actions">
+            <button class="save-modal-btn" onclick="saveEnvironmentVars()">Save Changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Code Drawer -->
+      <div id="statusHelper" class="status-helper-drawer">
+        <div class="drawer-header">
+          <h3>Status Code Reference</h3>
+          <button class="close-drawer" onclick="toggleStatusHelper()">&times;</button>
+        </div>
+        <div class="drawer-search">
+          <input type="text" id="statusSearch" placeholder="Search status code (e.g. 404, Unauthorized)..." onkeyup="filterStatusCodes()" />
+        </div>
+        <div class="drawer-content" id="statusCodeList">
+          <!-- Dynamic insertion -->
+        </div>
+      </div>
+
     </div>
 
     <script src="script.js"></script>

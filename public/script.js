@@ -1,148 +1,566 @@
-async function sendRequest(fromHistory = false) {
-  const url = document.getElementById("apiUrl").value;
+// App State
+let activeSidebarTab = 'history';
+let activeEnvTab = 'dev';
+const email = localStorage.getItem("userEmail");
+const name = localStorage.getItem("userName");
+
+// Initialize application
+window.onload = () => {
+  if (!name || !email) {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  const userDisplay = document.getElementById("userDisplay");
+  if (userDisplay) {
+    userDisplay.textContent = `Welcome, ${name}`;
+  }
+
+  // Load environments, history, and saved requests
+  initEnvironments();
+  loadHistory();
+  loadSavedRequests();
+
+  // Initialize header table with an empty row
+  addHeaderRow();
+
+  // Initialize Status Code list
+  initStatusCodes();
+};
+
+// Toggle Sidebar Collapse
+function toggleSidebar() {
+  const sidebar = document.querySelector(".sidebar");
+  sidebar.classList.toggle("collapsed");
+}
+
+// Switch Sidebar Tabs (History vs Saved Requests)
+function switchSidebarTab(tab) {
+  activeSidebarTab = tab;
+  document.getElementById("tab-history-btn").classList.toggle("active", tab === 'history');
+  document.getElementById("tab-saved-btn").classList.toggle("active", tab === 'saved');
+
+  document.getElementById("historySection").style.display = tab === 'history' ? 'flex' : 'none';
+  document.getElementById("savedSection").style.display = tab === 'saved' ? 'flex' : 'none';
+
+  if (tab === 'history') loadHistory();
+  else loadSavedRequests();
+}
+
+// ----------------------------------------------------
+// ENVIRONMENT VARIABLES MANAGEMENT
+// ----------------------------------------------------
+const defaultEnvs = {
+  dev: { base_url: "http://localhost:3000" },
+  test: { base_url: "https://httpbin.org" },
+  prod: { base_url: "https://api.github.com" }
+};
+
+function initEnvironments() {
+  if (!localStorage.getItem("env_variables")) {
+    localStorage.setItem("env_variables", JSON.stringify(defaultEnvs));
+  }
+  if (!localStorage.getItem("selected_env")) {
+    localStorage.setItem("selected_env", "none");
+  }
+
+  // Set selector to match stored value
+  const selectedEnv = localStorage.getItem("selected_env");
+  document.getElementById("envSelector").value = selectedEnv;
+}
+
+function handleEnvChange() {
+  const selectedEnv = document.getElementById("envSelector").value;
+  localStorage.setItem("selected_env", selectedEnv);
+}
+
+function openEnvModal() {
+  const modal = document.getElementById("envModal");
+  modal.style.display = "flex";
+  switchEnvTab(activeEnvTab);
+}
+
+function closeEnvModal() {
+  document.getElementById("envModal").style.display = "none";
+}
+
+function switchEnvTab(env) {
+  activeEnvTab = env;
+  document.getElementById("env-tab-dev").classList.toggle("active", env === 'dev');
+  document.getElementById("env-tab-test").classList.toggle("active", env === 'test');
+  document.getElementById("env-tab-prod").classList.toggle("active", env === 'prod');
+
+  const labelMap = { dev: "Development", test: "Testing", prod: "Production" };
+  document.getElementById("activeEnvLabel").textContent = labelMap[env];
+
+  renderEnvVarsGrid(env);
+}
+
+function renderEnvVarsGrid(env) {
+  const envs = JSON.parse(localStorage.getItem("env_variables")) || defaultEnvs;
+  const vars = envs[env] || {};
+  const tbody = document.getElementById("envTableBody");
+  tbody.innerHTML = "";
+
+  Object.entries(vars).forEach(([key, val]) => {
+    insertEnvRow(key, val);
+  });
+
+  // Always put an empty row if nothing
+  if (Object.keys(vars).length === 0) {
+    addEnvRow();
+  }
+}
+
+function insertEnvRow(key = '', val = '') {
+  const tbody = document.getElementById("envTableBody");
+  const tr = document.createElement("tr");
+
+  tr.innerHTML = `
+    <td><input type="text" class="env-key" placeholder="Variable name" value="${key}" /></td>
+    <td><input type="text" class="env-value" placeholder="Value" value="${val}" /></td>
+    <td><button class="remove-row-btn" onclick="this.closest('tr').remove()">&times;</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function addEnvRow() {
+  insertEnvRow();
+}
+
+function saveEnvironmentVars() {
+  const envs = JSON.parse(localStorage.getItem("env_variables")) || defaultEnvs;
+  const tbody = document.getElementById("envTableBody");
+  const rows = tbody.querySelectorAll("tr");
+  const updatedVars = {};
+
+  rows.forEach(row => {
+    const key = row.querySelector(".env-key").value.trim();
+    const val = row.querySelector(".env-value").value;
+
+    if (key) {
+      updatedVars[key] = val;
+    }
+  });
+
+  envs[activeEnvTab] = updatedVars;
+  localStorage.setItem("env_variables", JSON.stringify(envs));
+  alert(`Variables for environment "${activeEnvTab}" saved successfully!`);
+}
+
+// Variable Substituter Helper
+function replaceVariables(text) {
+  if (!text) return "";
+  const selectedEnv = localStorage.getItem("selected_env");
+  if (selectedEnv === "none") return text;
+
+  const envs = JSON.parse(localStorage.getItem("env_variables")) || defaultEnvs;
+  const vars = envs[selectedEnv] || {};
+
+  let resolvedText = text;
+  Object.entries(vars).forEach(([key, val]) => {
+    const placeholder = `{{${key}}}`;
+    resolvedText = resolvedText.split(placeholder).join(val);
+  });
+
+  return resolvedText;
+}
+
+// ----------------------------------------------------
+// HEADERS GRID BUILDER
+// ----------------------------------------------------
+function addHeaderRow(key = '', value = '') {
+  const tbody = document.getElementById("headersTableBody");
+  const tr = document.createElement("tr");
+
+  tr.innerHTML = `
+    <td><input type="text" class="header-key" placeholder="Key" value="${key}" /></td>
+    <td><input type="text" class="header-value" placeholder="Value" value="${value}" /></td>
+    <td><button class="remove-row-btn" onclick="removeHeaderRow(this)">&times;</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function removeHeaderRow(btn) {
+  const tbody = document.getElementById("headersTableBody");
+  btn.closest('tr').remove();
+  // Ensure we always have at least one row
+  if (tbody.querySelectorAll("tr").length === 0) {
+    addHeaderRow();
+  }
+}
+
+function getHeadersObject() {
+  const tbody = document.getElementById("headersTableBody");
+  const rows = tbody.querySelectorAll("tr");
+  const headers = {};
+
+  rows.forEach(row => {
+    const key = row.querySelector(".header-key").value.trim();
+    const val = row.querySelector(".header-value").value;
+
+    if (key) {
+      // Resolve variables in keys and values
+      headers[replaceVariables(key)] = replaceVariables(val);
+    }
+  });
+
+  return headers;
+}
+
+function populateHeadersGrid(headersObj) {
+  const tbody = document.getElementById("headersTableBody");
+  tbody.innerHTML = "";
+
+  if (!headersObj || Object.keys(headersObj).length === 0) {
+    addHeaderRow();
+    return;
+  }
+
+  Object.entries(headersObj).forEach(([key, val]) => {
+    addHeaderRow(key, val);
+  });
+}
+
+// ----------------------------------------------------
+// API REQUEST & HISTORY
+// ----------------------------------------------------
+async function sendRequest() {
+  const rawUrl = document.getElementById("apiUrl").value.trim();
   const method = document.getElementById("method").value;
-  const body = document.getElementById("body").value;
+  const rawBody = document.getElementById("body").value;
+
+  if (!rawUrl) {
+    alert("Please enter API URL");
+    return;
+  }
+
+  // Resolve Environment variables
+  const url = replaceVariables(rawUrl);
+  const body = replaceVariables(rawBody);
+  const headers = getHeadersObject();
 
   const statusElement = document.getElementById("status");
   const timeElement = document.getElementById("time");
   const responseElement = document.getElementById("response");
 
-  if (!url) {
-    alert("Please enter API URL");
-    return;
-  }
-
-  // add history only if request is new
-  if (!fromHistory) {
-    addToHistory(url, method);
-  }
-
-  let requestOptions = {
-    method: method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  };
-
-  if (method !== "GET" && body) {
-    requestOptions.body = body;
-  }
+  statusElement.textContent = "Loading...";
+  statusElement.className = "status-badge";
+  timeElement.textContent = "-";
+  responseElement.textContent = "Sending request...";
 
   try {
     const startTime = performance.now();
 
-    const response = await fetch(url, requestOptions);
+    const response = await fetch("/api/test-api", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        url,
+        method,
+        body: body ? JSON.parse(body) : undefined,
+        headers
+      })
+    });
 
     const endTime = performance.now();
-
+    const responseTime = (endTime - startTime).toFixed(2);
     const data = await response.json();
 
-    const responseTime = (endTime - startTime).toFixed(2);
+    // Check status code from test-api payload
+    const finalStatus = data.status || 500;
 
-    statusElement.textContent = response.status + " " + response.statusText;
-
+    statusElement.textContent = finalStatus;
+    statusElement.className = "status-badge " + getStatusClass(finalStatus);
     timeElement.textContent = responseTime + " ms";
-    responseElement.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
-    const email = localStorage.getItem("userEmail");
 
+    if (data.data) {
+      responseElement.innerHTML = syntaxHighlight(JSON.stringify(data.data, null, 2));
+    } else {
+      responseElement.textContent = JSON.stringify(data, null, 2);
+    }
+
+    // Save this call in MySQL history
     await fetch("/api/save-history", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        email: email,
-        method: method,
-        url: url,
-        body: body,
-        status: response.status,
-        time: responseTime,
-      }),
+        email,
+        method,
+        url: rawUrl, // Save the raw templated URL
+        headers,     // Save original headers
+        body: rawBody,
+        status: finalStatus,
+        time: responseTime
+      })
     });
+
+    if (activeSidebarTab === 'history') loadHistory();
+
   } catch (error) {
     statusElement.textContent = "Error";
-
+    statusElement.className = "status-badge danger";
     timeElement.textContent = "-";
-
     responseElement.textContent = error.message;
   }
 }
 
-function addToHistory(url, method) {
-  const historyList = document.getElementById("historyList");
-
-  const li = document.createElement("li");
-  li.className = "history-item";
-
-  const methodSpan = document.createElement("span");
-  methodSpan.className = "method " + method.toLowerCase();
-  methodSpan.textContent = method;
-
-  const urlSpan = document.createElement("span");
-  urlSpan.textContent = url;
-
-  li.appendChild(methodSpan);
-  li.appendChild(urlSpan);
-
-  li.onclick = async () => {
-    document.getElementById("apiUrl").value = url;
-    document.getElementById("method").value = method;
-
-    await sendRequest(true);
-  };
-
-  historyList.prepend(li);
+function getStatusClass(code) {
+  if (code >= 200 && code < 300) return "success";
+  if (code >= 300 && code < 400) return "warning";
+  return "danger";
 }
 
+async function loadHistory() {
+  const historyList = document.getElementById("historyList");
+  historyList.innerHTML = "<li>Loading history...</li>";
+
+  try {
+    const res = await fetch(`/api/history/${email}`);
+    if (!res.ok) throw new Error("Failed to load history");
+
+    const items = await res.json();
+    historyList.innerHTML = "";
+
+    if (items.length === 0) {
+      historyList.innerHTML = "<li style='padding: 10px; color: #94a3b8; font-size:13px;'>No requests found</li>";
+      return;
+    }
+
+    items.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "history-item";
+      li.innerHTML = `
+        <div class="item-meta">
+          <span class="method-badge ${item.method.toLowerCase()}">${item.method}</span>
+          <span style="font-weight: bold; color: ${item.status_code >= 200 && item.status_code < 300 ? '#10b981' : '#ef4444'}">${item.status_code}</span>
+        </div>
+        <div class="item-url">${item.url}</div>
+      `;
+
+      li.onclick = () => {
+        document.getElementById("apiUrl").value = item.url;
+        document.getElementById("method").value = item.method;
+        document.getElementById("body").value = item.request_body || "";
+        
+        let parsedHeaders = {};
+        try {
+          if (item.headers) parsedHeaders = JSON.parse(item.headers);
+        } catch(e) {}
+        populateHeadersGrid(parsedHeaders);
+      };
+
+      historyList.appendChild(li);
+    });
+  } catch (error) {
+    console.error(error);
+    historyList.innerHTML = "<li style='color:#ef4444;'>Failed to load history</li>";
+  }
+}
+
+async function clearHistory() {
+  if (!confirm("Are you sure you want to clear all history?")) return;
+
+  try {
+    await fetch(`/api/history/${email}`, { method: "DELETE" });
+    loadHistory();
+  } catch (error) {
+    alert("Failed to clear history");
+  }
+}
+
+// ----------------------------------------------------
+// SAVED REQUESTS (COLLECTIONS)
+// ----------------------------------------------------
+async function promptSaveRequest() {
+  const nameInput = prompt("Enter a name for this saved request:");
+  if (!nameInput) return;
+
+  const url = document.getElementById("apiUrl").value.trim();
+  const method = document.getElementById("method").value;
+  const body = document.getElementById("body").value;
+  const headers = getHeadersObject();
+
+  if (!url) {
+    alert("Please enter API URL to save");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/saved-requests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email,
+        name: nameInput,
+        method,
+        url,
+        headers,
+        body
+      })
+    });
+
+    if (!res.ok) throw new Error("Failed to save request");
+
+    alert("Request saved successfully!");
+    if (activeSidebarTab === 'saved') loadSavedRequests();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function loadSavedRequests() {
+  const savedList = document.getElementById("savedList");
+  savedList.innerHTML = "<li>Loading collections...</li>";
+
+  try {
+    const res = await fetch(`/api/saved-requests/${email}`);
+    if (!res.ok) throw new Error("Failed to load saved requests");
+
+    const items = await res.json();
+    savedList.innerHTML = "";
+
+    if (items.length === 0) {
+      savedList.innerHTML = "<li style='padding: 10px; color: #94a3b8; font-size:13px;'>No saved requests. Make one using 'Save Request'.</li>";
+      return;
+    }
+
+    items.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "saved-item";
+      li.innerHTML = `
+        <button class="delete-saved-btn" onclick="event.stopPropagation(); deleteSaved(${item.id})">&times;</button>
+        <div class="item-name">${item.name}</div>
+        <div class="item-meta">
+          <span class="method-badge ${item.method.toLowerCase()}">${item.method}</span>
+        </div>
+        <div class="item-url">${item.url}</div>
+      `;
+
+      li.onclick = () => {
+        document.getElementById("apiUrl").value = item.url;
+        document.getElementById("method").value = item.method;
+        document.getElementById("body").value = item.request_body || "";
+        
+        let parsedHeaders = {};
+        try {
+          if (item.headers) parsedHeaders = JSON.parse(item.headers);
+        } catch(e) {}
+        populateHeadersGrid(parsedHeaders);
+      };
+
+      savedList.appendChild(li);
+    });
+  } catch (error) {
+    console.error(error);
+    savedList.innerHTML = "<li style='color:#ef4444;'>Failed to load requests</li>";
+  }
+}
+
+async function deleteSaved(id) {
+  if (!confirm("Remove this request from saved items?")) return;
+
+  try {
+    const res = await fetch(`/api/saved-requests/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error();
+    loadSavedRequests();
+  } catch (error) {
+    alert("Failed to delete request");
+  }
+}
+
+// ----------------------------------------------------
+// STATUS CODE VIEWER DRAWER
+// ----------------------------------------------------
+const statusCodesData = [
+  { code: 200, name: "OK", desc: "The request succeeded. The response payload depends on the method." },
+  { code: 201, name: "Created", desc: "The request succeeded, and a new resource was created as a result." },
+  { code: 204, name: "No Content", desc: "The request succeeded, but there is no representation to return." },
+  { code: 301, name: "Moved Permanently", desc: "The URL of the requested resource has been changed permanently." },
+  { code: 302, name: "Found", desc: "The requested resource resides temporarily under a different URI." },
+  { code: 400, name: "Bad Request", desc: "The server cannot process the request due to client error (e.g. malformed JSON)." },
+  { code: 401, name: "Unauthorized", desc: "The request lacks valid authentication credentials for the target resource." },
+  { code: 403, name: "Forbidden", desc: "The client does not have access rights to the content (authorization failure)." },
+  { code: 404, name: "Not Found", desc: "The server cannot find the requested resource or path." },
+  { code: 422, name: "Unprocessable Entity", desc: "The request was well-formed but was unable to be followed due to semantic errors." },
+  { code: 500, name: "Internal Server Error", desc: "The server encountered an unexpected condition that prevented it from fulfilling the request." },
+  { code: 502, name: "Bad Gateway", desc: "The server, while acting as a gateway or proxy, received an invalid response from the upstream server." },
+  { code: 503, name: "Service Unavailable", desc: "The server is currently unable to handle the request due to temporary overloading or maintenance." }
+];
+
+function toggleStatusHelper() {
+  const drawer = document.getElementById("statusHelper");
+  drawer.classList.toggle("open");
+}
+
+function initStatusCodes() {
+  const container = document.getElementById("statusCodeList");
+  container.innerHTML = "";
+
+  statusCodesData.forEach(sc => {
+    let group = "sc-2xx";
+    if (sc.code >= 300) group = "sc-3xx";
+    if (sc.code >= 400) group = "sc-4xx";
+    if (sc.code >= 500) group = "sc-5xx";
+
+    const div = document.createElement("div");
+    div.className = `status-info-card ${group}`;
+    div.setAttribute("data-search", `${sc.code} ${sc.name.toLowerCase()} ${sc.desc.toLowerCase()}`);
+    div.innerHTML = `
+      <div class="status-info-code">${sc.code} - ${sc.name}</div>
+      <div class="status-info-desc">${sc.desc}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function filterStatusCodes() {
+  const query = document.getElementById("statusSearch").value.toLowerCase().trim();
+  const cards = document.querySelectorAll(".status-info-card");
+
+  cards.forEach(card => {
+    const text = card.getAttribute("data-search");
+    if (text.includes(query)) {
+      card.style.display = "block";
+    } else {
+      card.style.display = "none";
+    }
+  });
+}
+
+// ----------------------------------------------------
+// UI UTILITIES
+// ----------------------------------------------------
 function clearFields() {
   document.getElementById("apiUrl").value = "";
   document.getElementById("body").value = "";
   document.getElementById("response").textContent = "";
   document.getElementById("status").textContent = "-";
+  document.getElementById("status").className = "status-badge";
   document.getElementById("time").textContent = "-";
-}
-
-function clearHistory() {
-  document.getElementById("historyList").innerHTML = "";
+  populateHeadersGrid({});
 }
 
 function copyResponse() {
   const responseText = document.getElementById("response").textContent;
-
-  if (!responseText) {
+  if (!responseText || responseText === "Sending request...") {
     alert("No response to copy");
     return;
   }
-
   navigator.clipboard.writeText(responseText);
-
   alert("Response copied to clipboard!");
 }
 
 function logout() {
   localStorage.removeItem("userName");
   localStorage.removeItem("userEmail");
-
   window.location.href = "/login.html";
-}
-window.onload = () => {
-  const name = localStorage.getItem("userName");
-
-  if (!name) {
-    window.location.href = "/login.html";
-    return;
-  }
-
-  const display = document.getElementById("userDisplay");
-  if (display) {
-    display.textContent = "Welcome " + name;
-  }
-};
-
-function toggleSidebar() {
-  const sidebar = document.querySelector(".sidebar");
-
-  sidebar.classList.toggle("collapsed");
 }
 
 function syntaxHighlight(json) {
@@ -155,7 +573,6 @@ function syntaxHighlight(json) {
     /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
     function (match) {
       let cls = "number";
-
       if (/^"/.test(match)) {
         if (/:$/.test(match)) {
           cls = "key";
@@ -167,8 +584,7 @@ function syntaxHighlight(json) {
       } else if (/null/.test(match)) {
         cls = "null";
       }
-
-      return '<span class="' + cls + '">' + match + "</span>";
-    },
+      return '<span class="' + cls + '">' + match + '</span>';
+    }
   );
 }
