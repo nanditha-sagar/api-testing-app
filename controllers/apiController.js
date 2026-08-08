@@ -1,5 +1,7 @@
 const axios = require("axios");
-const db = require("../config/db");
+const User = require("../models/User");
+const ApiHistory = require("../models/ApiHistory");
+const SavedRequest = require("../models/SavedRequest");
 
 const crypto = require("crypto");
 
@@ -47,163 +49,152 @@ const testAPI = async (req, res) => {
 };
 
 // register controller
-const registerUser = (req, res) => {
+
+const registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
-  const checkUser = "SELECT * FROM users WHERE email = ?";
-
-  db.query(checkUser, [email], (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
-
-    if (result.length > 0) {
+  try {
+    // Check if user exists
+    const existing = await User.findOne({ email });
+    if (existing) {
       return res.status(400).json({ message: "User already exists" });
     }
-
     const hashedPassword = hashPassword(password);
-    const insertUser = "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
-
-    db.query(insertUser, [name, email, hashedPassword], (err, data) => {
-      if (err) {
-        return res.status(500).json(err);
-      }
-
-      res.json({ message: "User registered successfully" });
-    });
-  });
+    const newUser = new User({ name, email, password: hashedPassword });
+    await newUser.save();
+    res.json({ message: "User registered successfully" });
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 // login controller
-const loginUser = (req, res) => {
+const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ message: "Email and password are required" });
   }
 
-  const checkUser = "SELECT * FROM users WHERE email = ?";
-
-  db.query(checkUser, [email], (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
-
-    if (result.length === 0) {
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
-
-    const user = result[0];
     const isMatch = verifyPassword(password, user.password);
-
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
-
     res.json({
-      message: "Login successful",
-      user: {
-        name: user.name,
-        email: user.email
-      }
+        message: "Login successful",
+        user: {
+          name: user.name,
+          email: user.email
+        }
     });
-  });
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 // save history
-const saveHistory = (req, res) => {
+const saveHistory = async (req, res) => {
   const { email, method, url, headers, body, status, time } = req.body;
 
-  const sql = `
-INSERT INTO api_history
-(user_email, method, url, headers, request_body, status_code, response_time)
-VALUES (?, ?, ?, ?, ?, ?, ?)
-`;
-
-  db.query(sql, [email, method, url, headers ? JSON.stringify(headers) : null, body, status, time], (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
-
+  try {
+    const history = new ApiHistory({
+      user_email: email,
+      method,
+      url,
+      headers: headers || null,
+      request_body: body,
+      status_code: status,
+      response_time: time
+    });
+    await history.save();
     res.json({ message: "History stored successfully" });
-  });
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 // get user history
-const getHistory = (req, res) => {
+const getHistory = async (req, res) => {
   const { email } = req.params;
 
-  const sql = "SELECT * FROM api_history WHERE user_email = ? ORDER BY created_at DESC LIMIT 50";
-  db.query(sql, [email], (err, results) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
-    res.json(results);
-  });
+  try {
+    const histories = await ApiHistory.find({ user_email: email })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json(histories);
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 // clear user history
-const clearUserHistory = (req, res) => {
+const clearUserHistory = async (req, res) => {
   const { email } = req.params;
 
-  const sql = "DELETE FROM api_history WHERE user_email = ?";
-  db.query(sql, [email], (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
+  try {
+    await ApiHistory.deleteMany({ user_email: email });
     res.json({ message: "History cleared successfully" });
-  });
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 // save a request
-const saveRequest = (req, res) => {
+const saveRequest = async (req, res) => {
   const { email, name, method, url, headers, body } = req.body;
 
   if (!email || !name || !method || !url) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  const sql = `
-INSERT INTO saved_requests (user_email, name, method, url, headers, request_body)
-VALUES (?, ?, ?, ?, ?, ?)
-`;
-
-  db.query(sql, [email, name, method, url, headers ? JSON.stringify(headers) : null, body], (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
-    res.json({ message: "Request saved successfully", id: result.insertId });
-  });
+  try {
+    const saved = new SavedRequest({
+      user_email: email,
+      name,
+      method,
+      url,
+      headers: headers || null,
+      request_body: body
+    });
+    await saved.save();
+    res.json({ message: "Request saved successfully", id: saved._id });
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 // get saved requests
-const getSavedRequests = (req, res) => {
+const getSavedRequests = async (req, res) => {
   const { email } = req.params;
 
-  const sql = "SELECT * FROM saved_requests WHERE user_email = ? ORDER BY created_at DESC";
-  db.query(sql, [email], (err, results) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
-    res.json(results);
-  });
+  try {
+    const savedRequests = await SavedRequest.find({ user_email: email })
+      .sort({ createdAt: -1 });
+    res.json(savedRequests);
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 // delete saved request
-const deleteSavedRequest = (req, res) => {
+const deleteSavedRequest = async (req, res) => {
   const { id } = req.params;
 
-  const sql = "DELETE FROM saved_requests WHERE id = ?";
-  db.query(sql, [id], (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
+  try {
+    await SavedRequest.findByIdAndDelete(id);
     res.json({ message: "Saved request deleted successfully" });
-  });
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 module.exports = {
@@ -216,4 +207,4 @@ module.exports = {
   saveRequest,
   getSavedRequests,
   deleteSavedRequest
-};
+}
