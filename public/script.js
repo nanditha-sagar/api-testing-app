@@ -588,3 +588,236 @@ function syntaxHighlight(json) {
     }
   );
 }
+
+// ----------------------------------------------------
+// AI ASSISTANT — Main
+// ----------------------------------------------------
+async function generateAIInsights() {
+  const url    = document.getElementById("apiUrl").value.trim();
+  const method = document.getElementById("method").value;
+
+  if (!url) {
+    alert("Please enter an API URL first, then click AI Assistant.");
+    return;
+  }
+
+  // Show panel
+  const panel = document.getElementById("aiPanel");
+  panel.style.display = "block";
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Reset states
+  document.getElementById("aiLoading").style.display    = "flex";
+  document.getElementById("aiError").style.display      = "none";
+  document.getElementById("aiTabs").style.display       = "none";
+  document.getElementById("aiTabContent").style.display = "none";
+
+  // Gather current request body and response
+  const bodyText = document.getElementById("body").value;
+  let bodyJson = null;
+  try { if (bodyText) bodyJson = JSON.parse(bodyText); } catch(e) {}
+
+  const statusText = document.getElementById("status").textContent;
+  const status = parseInt(statusText) || null;
+
+  const responseText = document.getElementById("response").textContent;
+  let responseData = null;
+  // If we just sent a request and got a response, try to parse it
+  if (responseText && responseText !== "Sending request..." && responseText !== "Loading...") {
+    try { responseData = JSON.parse(responseText); } catch(e) { responseData = responseText; }
+  }
+
+  const payload = {
+    method: method,
+    url: url,
+    headers: getHeadersObject(),
+    body: bodyJson,
+    status: status,
+    response_data: responseData,
+    error_message: (status && status >= 400) ? `HTTP ${status} error` : "",
+    mode: "all"
+  };
+
+  const btn = document.getElementById("ai-assist-btn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Analyzing…";
+
+  try {
+    const res  = await fetch("/api/ai-assist", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || data.error || "AI generation failed");
+    }
+
+    // Render results
+    renderTestCases(data.test_cases   || []);
+    renderPayloads(data.payloads      || []);
+    renderEdgeCases(data.edge_cases   || []);
+    renderDebug(data.debug            || null);
+
+    document.getElementById("aiLoading").style.display    = "none";
+    document.getElementById("aiTabs").style.display       = "flex";
+    document.getElementById("aiTabContent").style.display = "block";
+    switchAITab("tests");
+
+  } catch (err) {
+    document.getElementById("aiLoading").style.display = "none";
+    document.getElementById("aiError").style.display   = "flex";
+    document.getElementById("aiErrorMsg").textContent  = err.message;
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = "🤖 AI Assistant";
+  }
+}
+
+function closeAIPanel() {
+  document.getElementById("aiPanel").style.display = "none";
+}
+
+// ----------------------------------------------------
+// AI ASSISTANT — Tab Switcher
+// ----------------------------------------------------
+function switchAITab(tab) {
+  ["tests", "payloads", "edge", "debug"].forEach(t => {
+    document.getElementById(`ai-tab-${t}`).classList.toggle("active", t === tab);
+    document.getElementById(`ai-content-${t}`).style.display = t === tab ? "block" : "none";
+  });
+}
+
+// ----------------------------------------------------
+// AI ASSISTANT — Renderers
+// ----------------------------------------------------
+const categoryIcons = {
+  happy_path: "✅", authentication: "🔐", validation: "📋",
+  error_handling: "⚠️", performance: "⚡"
+};
+const riskColors = { low: "#10b981", medium: "#f59e0b", high: "#ef4444" };
+const severityColors = { critical: "#ef4444", high: "#f97316", medium: "#f59e0b", low: "#10b981" };
+
+function renderTestCases(cases) {
+  const c = document.getElementById("testCasesContainer");
+  if (!cases.length) { c.innerHTML = "<p class='ai-empty'>No test cases generated.</p>"; return; }
+  c.innerHTML = cases.map(tc => `
+    <div class="ai-card tc-card">
+      <div class="ai-card-header">
+        <span class="ai-card-icon">${categoryIcons[tc.category] || "🧪"}</span>
+        <div>
+          <div class="ai-card-id">${tc.id}</div>
+          <div class="ai-card-name">${tc.name}</div>
+        </div>
+        <span class="ai-chip ai-chip-${tc.category?.replace('_','-')}">${tc.category?.replace(/_/g,' ')}</span>
+      </div>
+      <p class="ai-card-desc">${tc.description}</p>
+      <div class="ai-card-meta">
+        <span class="method-badge ${tc.method?.toLowerCase()}">${tc.method}</span>
+        <code class="ai-url">${tc.url}</code>
+        <span class="ai-expected">Expected: <strong>${tc.expected_status}</strong></span>
+      </div>
+      ${tc.body && Object.keys(tc.body).length ? `<pre class="ai-code">${JSON.stringify(tc.body, null, 2)}</pre>` : ''}
+      <p class="ai-behavior"><em>${tc.expected_behavior}</em></p>
+    </div>
+  `).join("");
+}
+
+function renderPayloads(payloads) {
+  const c = document.getElementById("payloadsContainer");
+  if (!payloads.length) { c.innerHTML = "<p class='ai-empty'>No payloads generated.</p>"; return; }
+  c.innerHTML = payloads.map((p, i) => `
+    <div class="ai-card">
+      <div class="ai-card-header">
+        <span class="ai-card-icon">📦</span>
+        <div>
+          <div class="ai-card-id">Payload ${i + 1}</div>
+          <div class="ai-card-name">${p.name}</div>
+        </div>
+        <button class="ai-copy-btn" onclick="copyAIPayload(${i})">Copy</button>
+      </div>
+      <p class="ai-card-desc">${p.description}</p>
+      ${p.headers && Object.keys(p.headers).length ? `
+        <div class="ai-sub-label">Headers</div>
+        <pre class="ai-code">${JSON.stringify(p.headers, null, 2)}</pre>` : ''}
+      ${p.body && Object.keys(p.body).length ? `
+        <div class="ai-sub-label">Body</div>
+        <pre class="ai-code" id="payload-body-${i}">${JSON.stringify(p.body, null, 2)}</pre>` : '<p class="ai-empty" style="margin:8px 0">No body (e.g. GET request)</p>'}
+    </div>
+  `).join("");
+
+  // Store payloads for copy
+  window._aiPayloads = payloads;
+}
+
+function copyAIPayload(i) {
+  const p = (window._aiPayloads || [])[i];
+  if (!p) return;
+  navigator.clipboard.writeText(JSON.stringify(p.body || {}, null, 2));
+  alert("Payload copied!");
+}
+
+function renderEdgeCases(cases) {
+  const c = document.getElementById("edgeCasesContainer");
+  if (!cases.length) { c.innerHTML = "<p class='ai-empty'>No edge cases generated.</p>"; return; }
+  c.innerHTML = cases.map(ec => `
+    <div class="ai-card ec-card" style="border-left: 3px solid ${riskColors[ec.risk_level] || '#6366f1'}">
+      <div class="ai-card-header">
+        <span class="ai-card-icon">⚡</span>
+        <div>
+          <div class="ai-card-id">${ec.id}</div>
+          <div class="ai-card-name">${ec.type?.replace(/_/g,' ')}</div>
+        </div>
+        <span class="ai-risk-badge" style="color:${riskColors[ec.risk_level]}">
+          ${ec.risk_level?.toUpperCase()} RISK
+        </span>
+      </div>
+      <div class="ai-ec-field">Field: <code>${ec.field}</code></div>
+      <div class="ai-ec-input">Input: <code class="ai-input-val">${String(ec.input)}</code></div>
+      <p class="ai-card-desc">${ec.description}</p>
+      <p class="ai-behavior">Expected: <em>${ec.expected_behavior}</em></p>
+    </div>
+  `).join("");
+}
+
+function renderDebug(debug) {
+  const c = document.getElementById("debugContainer");
+  if (!debug) { c.innerHTML = "<p class='ai-empty'>No debug data. Make an API call first.</p>"; return; }
+
+  const sev = debug.severity || "medium";
+  c.innerHTML = `
+    <div class="ai-debug-root">
+      <div class="ai-debug-cause" style="border-color: ${severityColors[sev]}">
+        <span class="ai-debug-sev-badge" style="background:${severityColors[sev]}">${sev.toUpperCase()}</span>
+        <p>${debug.root_cause}</p>
+      </div>
+    </div>
+
+    <h3 class="ai-section-title">🔧 Suggestions</h3>
+    ${(debug.suggestions || []).map(s => `
+      <div class="ai-card suggestion-card">
+        <div class="ai-card-header">
+          <span class="ai-priority-badge">#${s.priority}</span>
+          <div class="ai-card-name">${s.title}</div>
+        </div>
+        <p class="ai-card-desc">${s.description}</p>
+        <div class="ai-action-box">💡 ${s.action}</div>
+        ${s.code_example && s.code_example !== 'null' && s.code_example !== '' ? `<pre class="ai-code">${s.code_example}</pre>` : ''}
+      </div>
+    `).join("")}
+
+    ${(debug.quick_fixes || []).length ? `
+      <h3 class="ai-section-title">⚡ Quick Fixes</h3>
+      <ul class="ai-quick-fixes">
+        ${debug.quick_fixes.map(f => `<li>${f}</li>`).join("")}
+      </ul>` : ''}
+
+    ${(debug.prevention_tips || []).length ? `
+      <h3 class="ai-section-title">🛡️ Prevention Tips</h3>
+      <ul class="ai-prevention-tips">
+        ${debug.prevention_tips.map(t => `<li>${t}</li>`).join("")}
+      </ul>` : ''}
+  `;
+}
+

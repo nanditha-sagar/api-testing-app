@@ -2,6 +2,7 @@ const axios = require("axios");
 const User = require("../models/User");
 const ApiHistory = require("../models/ApiHistory");
 const SavedRequest = require("../models/SavedRequest");
+const { generateInsights } = require("../services/aiService");
 
 const crypto = require("crypto");
 
@@ -197,6 +198,32 @@ const deleteSavedRequest = async (req, res) => {
   }
 };
 
+// AI Insights controller — powered by LangChain.js + Groq
+const generateAIInsights = async (req, res) => {
+  const { method, url, headers, body, status, response_data, error_message, mode } = req.body;
+
+  if (!method || !url) {
+    return res.status(400).json({ message: "method and url are required" });
+  }
+
+  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === "your_groq_api_key_here") {
+    return res.status(503).json({
+      message: "GROQ_API_KEY is not configured. Add your key to .env and restart the server."
+    });
+  }
+
+  try {
+    const result = await generateInsights(
+      { method, url, headers, body, status, response_data, error_message },
+      mode || "all"
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("[AI] LangChain error:", error.message);
+    res.status(500).json({ message: "AI generation failed", error: error.message });
+  }
+};
+
 module.exports = {
   testAPI,
   registerUser,
@@ -206,5 +233,6 @@ module.exports = {
   clearUserHistory,
   saveRequest,
   getSavedRequests,
-  deleteSavedRequest
+  deleteSavedRequest,
+  generateAIInsights
 }

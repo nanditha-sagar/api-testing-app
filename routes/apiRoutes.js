@@ -10,7 +10,8 @@ const {
   clearUserHistory,
   saveRequest,
   getSavedRequests,
-  deleteSavedRequest
+  deleteSavedRequest,
+  generateAIInsights
 } = require("../controllers/apiController");
 
 // route to test API
@@ -31,5 +32,8 @@ router.delete("/history/:email", clearUserHistory);
 router.post("/saved-requests", saveRequest);
 router.get("/saved-requests/:email", getSavedRequests);
 router.delete("/saved-requests/:id", deleteSavedRequest);
+
+// AI Insights route
+router.post("/ai-assist", generateAIInsights);
 
 module.exports = router;

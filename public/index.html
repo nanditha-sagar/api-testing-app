@@ -101,8 +101,9 @@
           <textarea id="body" rows="6" placeholder='{ "title": "foo", "body": "bar", "userId": 1 }'></textarea>
 
           <div class="buttons">
-            <button class="send-btn" onclick="sendRequest()">Send Request</button>
+            <button class="send-btn" onclick="sendRequest()" id="send-request-btn">Send Request</button>
             <button class="save-request-btn" onclick="promptSaveRequest()">Save Request</button>
+            <button class="ai-btn" id="ai-assist-btn" onclick="generateAIInsights()" title="Generate test cases, payloads & debug suggestions using AI">🤖 AI Assistant</button>
             <button class="clear-fields-btn" onclick="clearFields()">Clear Fields</button>
           </div>
 
@@ -122,6 +123,61 @@
 
             <div class="response-box">
               <pre id="response"></pre>
+            </div>
+          </div>
+
+          <!-- AI ASSISTANT PANEL -->
+          <div class="ai-panel" id="aiPanel" style="display:none;">
+            <div class="ai-panel-header">
+              <div class="ai-panel-title">
+                <span class="ai-icon">🤖</span>
+                <h2>AI Assistant</h2>
+                <span class="ai-badge">Groq · LangChain</span>
+              </div>
+              <button class="ai-close-btn" onclick="closeAIPanel()">✕</button>
+            </div>
+
+            <!-- AI Loading State -->
+            <div class="ai-loading" id="aiLoading" style="display:none;">
+              <div class="ai-spinner"></div>
+              <p>Analyzing API with <strong>llama-3.3-70b-versatile</strong>…</p>
+            </div>
+
+            <!-- AI Error State -->
+            <div class="ai-error" id="aiError" style="display:none;">
+              <span class="ai-error-icon">⚠️</span>
+              <p id="aiErrorMsg"></p>
+            </div>
+
+            <!-- AI Tabs -->
+            <div class="ai-tabs" id="aiTabs" style="display:none;">
+              <button id="ai-tab-tests" class="ai-tab-btn active" onclick="switchAITab('tests')">🧪 Test Cases</button>
+              <button id="ai-tab-payloads" class="ai-tab-btn" onclick="switchAITab('payloads')">📦 Payloads</button>
+              <button id="ai-tab-edge" class="ai-tab-btn" onclick="switchAITab('edge')">⚡ Edge Cases</button>
+              <button id="ai-tab-debug" class="ai-tab-btn" onclick="switchAITab('debug')">🐛 Debug</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="ai-tab-content" id="aiTabContent" style="display:none;">
+              <!-- Test Cases -->
+              <div id="ai-content-tests" class="ai-content-pane">
+                <div id="testCasesContainer" class="ai-cards"></div>
+              </div>
+
+              <!-- Payloads -->
+              <div id="ai-content-payloads" class="ai-content-pane" style="display:none;">
+                <div id="payloadsContainer" class="ai-cards"></div>
+              </div>
+
+              <!-- Edge Cases -->
+              <div id="ai-content-edge" class="ai-content-pane" style="display:none;">
+                <div id="edgeCasesContainer" class="ai-cards"></div>
+              </div>
+
+              <!-- Debug -->
+              <div id="ai-content-debug" class="ai-content-pane" style="display:none;">
+                <div id="debugContainer"></div>
+              </div>
             </div>
           </div>
         </div>
