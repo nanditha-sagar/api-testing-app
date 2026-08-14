@@ -152,7 +152,7 @@ function getChains() {
   if (_chains) return _chains;
 
   const llm    = new ChatGroq({
-    model:     "openai/gpt-oss-120b",
+    model:     "llama-3.1-8b-instant",
     apiKey:    process.env.GROQ_API_KEY,
     temperature: 0.3,
     maxTokens: 1500,
