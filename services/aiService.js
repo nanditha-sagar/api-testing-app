@@ -216,27 +216,36 @@ function buildInputs({ method, url, headers, body, status, response_data, error_
  * @returns {Promise<object>}
  */
 async function generateInsights(ctx, mode = "all") {
+  const startTime = Date.now();
+  console.log(`[AI-Service] Starting insights generation for URL: ${ctx.url} | Method: ${ctx.method} | Mode: ${mode}`);
+  
   const chains = getChains(); // instantiates LLM once, reuses after
   const inputs = buildInputs(ctx);
   const result = {};
 
   if (mode === "test_cases" || mode === "all") {
+    console.log(`[AI-Service] Running test cases chain...`);
     const raw = await chains.testCases.invoke(inputs);
     result.test_cases = safeParseJSON(raw).test_cases || [];
   }
   if (mode === "payloads" || mode === "all") {
+    console.log(`[AI-Service] Running request payloads chain...`);
     const raw = await chains.payloads.invoke(inputs);
     result.payloads = safeParseJSON(raw).payloads || [];
   }
   if (mode === "edge_cases" || mode === "all") {
+    console.log(`[AI-Service] Running edge cases chain...`);
     const raw = await chains.edgeCases.invoke(inputs);
     result.edge_cases = safeParseJSON(raw).edge_cases || [];
   }
   if (mode === "debug" || mode === "all") {
+    console.log(`[AI-Service] Running debug suggestions chain...`);
     const raw = await chains.debug.invoke(inputs);
     result.debug = safeParseJSON(raw);
   }
 
+  const duration = Date.now() - startTime;
+  console.log(`[AI-Service] Completed insights generation successfully in ${duration}ms`);
   return result;
 }
 
