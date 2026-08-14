@@ -191,7 +191,20 @@ function safeParseJSON(raw) {
       .join("\n")
       .trim();
   }
-  return JSON.parse(text);
+
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    // Attempt basic JSON repairs
+    try {
+      let repaired = text
+        .replace(/,\s*([\]}])/g, "$1") // remove trailing commas
+        .replace(/(?:\r\n|\r|\n)/g, " "); // remove literal linebreaks inside raw JSON values
+      return JSON.parse(repaired);
+    } catch (e) {
+      throw new Error(`Failed to parse AI response as JSON: ${err.message}. Raw output: ${text.slice(0, 150)}...`);
+    }
+  }
 }
 
 function buildInputs({ method, url, headers, body, status, response_data, error_message }) {
