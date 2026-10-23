@@ -20,11 +20,6 @@ A full-stack web application for building, sending, and inspecting HTTP API requ
 - Manage Development, Testing, and Production environment variables
 - Use variables such as `{{base_url}}` in request URLs
 - Search an HTTP status-code reference
-- Generate AI-assisted:
-  - Test cases
-  - Request payloads
-  - Edge cases
-  - Debugging suggestions
 
 ## Tech Stack
 
@@ -46,11 +41,6 @@ A full-stack web application for building, sending, and inspecting HTTP API requ
 
 - MongoDB Atlas
 - Mongoose
-
-### AI Assistant
-
-- LangChain.js
-- Groq
 
 ## How It Works
 
